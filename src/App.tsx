@@ -16,7 +16,9 @@ import {
   Package,
   X,
   CreditCard,
-  Smartphone
+  Smartphone,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -112,6 +114,12 @@ export default function App() {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethodType>('WALLET');
   const [promoCode, setPromoCode] = useState('');
   const [isPromoApplied, setIsPromoApplied] = useState(false);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [currentPaymentOrder, setCurrentPaymentOrder] = useState<{ id: string; amount: number } | null>(null);
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    const saved = localStorage.getItem('qwikbrew-theme');
+    return (saved as 'light' | 'dark') || 'dark';
+  });
   const [orders, setOrders] = useState<Order[]>([
     { 
       id: 'QB-2024-001', 
@@ -280,6 +288,16 @@ export default function App() {
     showToast(`${item.name} added to cart`);
   };
 
+  useEffect(() => {
+    localStorage.setItem('qwikbrew-theme', theme);
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'light' ? 'dark' : 'light');
+    showToast(`Switched to ${theme === 'light' ? 'dark' : 'light'} mode`, 'info');
+  };
+
   const toggleWishlist = (id: number) => {
     setWishlist(prev => {
       const isPresent = prev.includes(id);
@@ -325,8 +343,13 @@ export default function App() {
 
     if (selectedPaymentMethod === 'WALLET') {
       setWalletBal(prev => prev - grandTotal);
+    } else if (selectedPaymentMethod === 'UPI') {
+      const orderId = Math.random().toString(36).substring(2, 11).toUpperCase();
+      setCurrentPaymentOrder({ id: orderId, amount: grandTotal });
+      setIsPaymentModalOpen(true);
+      return; // Wait for QR payment confirmation
     } else {
-      // Simulate external payment gateway
+      // Simulate external payment gateway for CARD/NETBANKING
       showToast(`Redirecting to ${selectedPaymentMethod} gateway...`, 'info');
     }
 
@@ -335,17 +358,20 @@ export default function App() {
       id: Math.random().toString(36).substring(2, 11).toUpperCase() 
     };
     
-    // Simulate a small delay for non-wallet payments
+    finalizeOrder(newOrder);
+  };
+
+  const finalizeOrder = (orderData: { id: string; amount: number }) => {
     const delay = selectedPaymentMethod === 'WALLET' ? 0 : 1500;
     
     setTimeout(() => {
-      setOrderSuccess(newOrder);
+      setOrderSuccess(orderData);
       setOrders(prev => [
         { 
-          id: newOrder.id, 
+          id: orderData.id, 
           status: 'PREPARING', 
           date: 'Just Now', 
-          total: grandTotal, 
+          total: orderData.amount, 
           items: cart.map(i => `${i.name} x${i.qty}`).join(', '),
           itemDetails: cart.map(i => ({ name: i.name, qty: i.qty, price: i.price, emoji: i.emoji }))
         },
@@ -354,6 +380,7 @@ export default function App() {
       setCart([]);
       setIsPromoApplied(false);
       setPromoCode('');
+      setIsPaymentModalOpen(false);
       showToast('Order placed successfully!', 'success');
     }, delay);
   };
@@ -380,7 +407,7 @@ export default function App() {
           <div className="flex items-center gap-4 mb-8">
             <div className="sb-logo text-white">☕</div>
             <div>
-              <h1 className="text-2xl font-serif italic text-white">Qwik<span className="text-[var(--brand)] not-italic">Brew</span></h1>
+              <h1 className="text-2xl font-serif italic text-[var(--tx)]">Qwik<span className="text-[var(--brand)] not-italic">Brew</span></h1>
               <p className="text-xs text-[var(--tx4)] font-bold uppercase tracking-widest">Corporate Café Portal</p>
             </div>
           </div>
@@ -418,7 +445,7 @@ export default function App() {
         <div className="sb-brand">
           <div className="sb-logo text-white">☕</div>
           <div>
-            <div className="fd text-lg text-white">Qwik<span className="text-[var(--brand)] not-italic">Brew</span></div>
+            <div className="fd text-lg text-[var(--tx)]">Qwik<span className="text-[var(--brand)] not-italic">Brew</span></div>
             <div className="text-[9px] text-[var(--tx4)] font-bold uppercase tracking-widest">Corporate Café</div>
           </div>
         </div>
@@ -473,7 +500,7 @@ export default function App() {
       {/* Main Content */}
       <main className="main">
         <header className="topbar">
-          <div className="fd text-lg flex-1 text-white">{page === 'menu' ? 'Menu' : page === 'orders' ? 'My Orders' : 'Profile'}</div>
+          <div className="fd text-lg flex-1 text-[var(--tx)]">{page === 'menu' ? 'Menu' : page === 'orders' ? 'My Orders' : 'Profile'}</div>
           {page === 'menu' && (
             <div className="relative w-80">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--tx4)]" />
@@ -487,6 +514,14 @@ export default function App() {
             </div>
           )}
           <div className="flex items-center gap-3">
+            <button 
+              onClick={toggleTheme}
+              className="p-2 bg-[var(--s2)] border border-[var(--b1)] rounded-full text-[var(--tx3)] hover:text-[var(--brand)] transition-all relative group"
+              title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+            >
+              {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+            </button>
+
             <div className="flex items-center gap-2 px-3 py-1.5 bg-[var(--s2)] border border-[var(--b1)] rounded-full text-[10px] font-bold text-white">
               <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse shadow-[0_0_6px_rgba(74,222,128,.6)]" />
               Café Open
@@ -671,7 +706,7 @@ export default function App() {
                             </button>
                           </div>
                           <div className="p-4">
-                            <div className="fd text-base mb-1 text-white">{item.name}</div>
+                            <div className="fd text-base mb-1 text-[var(--tx)]">{item.name}</div>
                             <div className="flex justify-between items-center mt-4">
                               <div className="fm text-lg text-[var(--brand-xlt)]">₹{item.price}</div>
                               <button 
@@ -765,7 +800,7 @@ export default function App() {
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-1">
-                            <span className="fm text-sm font-bold text-white">{order.id}</span>
+                            <span className="fm text-sm font-bold text-[var(--tx)]">{order.id}</span>
                             <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${
                               order.status === 'DELIVERED' ? 'bg-green-500/20 text-green-500' : 
                               order.status === 'OUT_FOR_DELIVERY' ? 'bg-blue-500/20 text-blue-500' :
@@ -830,7 +865,7 @@ export default function App() {
 
                   <div className="bg-[var(--s1)] border border-[var(--b1)] rounded-3xl p-6">
                     <div className="flex justify-between items-center mb-4">
-                      <div className="fd text-sm text-white">BrewPoints</div>
+                      <div className="fd text-sm text-[var(--tx)]">BrewPoints</div>
                       <div className="text-[10px] text-[var(--brand-xlt)] font-bold cursor-pointer hover:underline">Redeem →</div>
                     </div>
                     <div className="text-4xl font-black text-[var(--brand)] mb-2">{user.brewPoints.toLocaleString()}</div>
@@ -845,11 +880,62 @@ export default function App() {
                   </div>
                 </div>
 
+                {/* Theme Settings */}
+                <div className="bg-[var(--s1)] border border-[var(--b1)] rounded-3xl p-8">
+                  <div className="flex items-center justify-between mb-8">
+                    <div>
+                      <h3 className="fd text-xl text-[var(--tx)] mb-1">Theme Settings</h3>
+                      <p className="text-xs text-[var(--tx4)]">Customize the appearance of your application.</p>
+                    </div>
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl bg-[var(--s3)] text-[var(--tx4)]`}>
+                      {theme === 'light' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <button 
+                      onClick={() => setTheme('light')}
+                      className={`p-5 rounded-2xl border transition-all text-left relative group ${
+                        theme === 'light' 
+                          ? 'bg-[var(--brand-gl3)] border-[var(--brand)] shadow-lg' 
+                          : 'bg-[var(--s2)] border-[var(--b1)] hover:border-[var(--b2)]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-4">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg ${theme === 'light' ? 'bg-[var(--brand)] text-white' : 'bg-[var(--s3)] text-[var(--tx4)]'}`}>
+                          ☀️
+                        </div>
+                        {theme === 'light' && <div className="w-2 h-2 bg-[var(--brand)] rounded-full shadow-[0_0_8px_var(--brand)]" />}
+                      </div>
+                      <div className={`text-sm font-bold ${theme === 'light' ? 'text-white' : 'text-[var(--tx3)]'}`}>Light Mode</div>
+                      <div className="text-[10px] text-[var(--tx4)] uppercase tracking-widest font-bold mt-1">Clean & Bright</div>
+                    </button>
+
+                    <button 
+                      onClick={() => setTheme('dark')}
+                      className={`p-5 rounded-2xl border transition-all text-left relative group ${
+                        theme === 'dark' 
+                          ? 'bg-[var(--brand-gl3)] border-[var(--brand)] shadow-lg' 
+                          : 'bg-[var(--s2)] border-[var(--b1)] hover:border-[var(--b2)]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-4">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg ${theme === 'dark' ? 'bg-[var(--brand)] text-white' : 'bg-[var(--s3)] text-[var(--tx4)]'}`}>
+                          🌙
+                        </div>
+                        {theme === 'dark' && <div className="w-2 h-2 bg-[var(--brand)] rounded-full shadow-[0_0_8px_var(--brand)]" />}
+                      </div>
+                      <div className={`text-sm font-bold ${theme === 'dark' ? 'text-white' : 'text-[var(--tx3)]'}`}>Dark Mode</div>
+                      <div className="text-[10px] text-[var(--tx4)] uppercase tracking-widest font-bold mt-1">Deep & Focused</div>
+                    </button>
+                  </div>
+                </div>
+
                 {/* Notification Settings */}
                 <div className="bg-[var(--s1)] border border-[var(--b1)] rounded-3xl p-8">
                   <div className="flex items-center justify-between mb-8">
                     <div>
-                      <h3 className="fd text-xl text-white mb-1">Notification Settings</h3>
+                      <h3 className="fd text-xl text-[var(--tx)] mb-1">Notification Settings</h3>
                       <p className="text-xs text-[var(--tx4)]">Manage how you receive updates about your orders and rewards.</p>
                     </div>
                     <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl ${notificationsEnabled ? 'bg-[var(--brand)] text-white' : 'bg-[var(--s3)] text-[var(--tx4)]'}`}>
@@ -864,7 +950,7 @@ export default function App() {
                           📱
                         </div>
                         <div>
-                          <div className="text-sm font-bold text-white">Push Notifications</div>
+                          <div className="text-sm font-bold text-[var(--tx)]">Push Notifications</div>
                           <div className="text-[10px] text-[var(--tx4)] uppercase tracking-widest font-bold">Status updates & Promos</div>
                         </div>
                       </div>
@@ -897,7 +983,7 @@ export default function App() {
                 <div className="bg-[var(--s1)] border border-[var(--b1)] rounded-3xl p-8">
                   <div className="flex items-center justify-between mb-8">
                     <div>
-                      <h3 className="fd text-xl text-white mb-1">Saved Payment Methods</h3>
+                      <h3 className="fd text-xl text-[var(--tx)] mb-1">Saved Payment Methods</h3>
                       <p className="text-xs text-[var(--tx4)]">Quickly checkout using your preferred payment options.</p>
                     </div>
                     <button className="text-[10px] font-bold text-[var(--brand)] hover:underline uppercase tracking-widest">+ Add New</button>
@@ -1077,25 +1163,45 @@ export default function App() {
                       </div>
 
                       <div className="space-y-3">
-                        <div className="text-[10px] text-[var(--tx4)] font-bold uppercase tracking-widest px-1">Payment Method</div>
+                        <div className="text-[10px] text-[var(--tx4)] font-bold uppercase tracking-widest px-1 flex justify-between">
+                          <span>Payment Method</span>
+                          {selectedPaymentMethod === 'WALLET' && (
+                            <span className={walletBal < grandTotal ? 'text-red-400' : 'text-[var(--gold-lt)]'}>
+                              Bal: ₹{walletBal.toFixed(2)}
+                            </span>
+                          )}
+                        </div>
                         <div className="grid grid-cols-2 gap-2">
                           {[
-                            { id: 'WALLET', label: 'Wallet', icon: <Wallet className="w-3 h-3" /> },
-                            { id: 'UPI', label: 'UPI', icon: <Smartphone className="w-3 h-3" /> },
-                            { id: 'CARD', label: 'Card', icon: <CreditCard className="w-3 h-3" /> },
-                            { id: 'NETBANKING', label: 'Net Banking', icon: '🏦' }
+                            { id: 'WALLET', label: 'Wallet', icon: <Wallet className="w-3.5 h-3.5" />, desc: 'Instant' },
+                            { id: 'UPI', label: 'UPI QR', icon: <Smartphone className="w-3.5 h-3.5" />, desc: 'Scan & Pay' },
+                            { id: 'CARD', label: 'Card', icon: <CreditCard className="w-3.5 h-3.5" />, desc: 'Visa/Master' },
+                            { id: 'NETBANKING', label: 'Bank', icon: <Package className="w-3.5 h-3.5" />, desc: 'All Banks' }
                           ].map(method => (
                             <button
                               key={method.id}
                               onClick={() => setSelectedPaymentMethod(method.id as PaymentMethodType)}
-                              className={`flex items-center gap-2 p-3 rounded-xl border text-[10px] font-bold transition-all ${
+                              className={`flex flex-col items-start gap-1 p-3 rounded-2xl border transition-all relative overflow-hidden group ${
                                 selectedPaymentMethod === method.id 
-                                  ? 'bg-[var(--brand-gl3)] border-[var(--brand)] text-white' 
-                                  : 'bg-[var(--s2)] border-[var(--b1)] text-[var(--tx4)] hover:border-[var(--b2)]'
+                                  ? 'bg-[var(--brand-gl3)] border-[var(--brand)] shadow-[0_0_15px_rgba(255,87,34,0.1)]' 
+                                  : 'bg-[var(--s2)] border-[var(--b1)] hover:border-[var(--b2)]'
                               }`}
                             >
-                              <span>{method.icon}</span>
-                              {method.label}
+                              <div className="flex items-center gap-2">
+                                <span className={selectedPaymentMethod === method.id ? 'text-[var(--brand)]' : 'text-[var(--tx4)]'}>
+                                  {method.icon}
+                                </span>
+                                <span className={`text-[11px] font-bold ${selectedPaymentMethod === method.id ? 'text-white' : 'text-[var(--tx3)]'}`}>
+                                  {method.label}
+                                </span>
+                              </div>
+                              <span className="text-[8px] text-[var(--tx4)] font-bold uppercase tracking-tighter">{method.desc}</span>
+                              {selectedPaymentMethod === method.id && (
+                                <motion.div 
+                                  layoutId="active-pay"
+                                  className="absolute top-2 right-2 w-1.5 h-1.5 bg-[var(--brand)] rounded-full shadow-[0_0_8px_var(--brand)]"
+                                />
+                              )}
                             </button>
                           ))}
                         </div>
@@ -1358,6 +1464,88 @@ export default function App() {
               >
                 View My Orders
               </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* UPI QR Payment Gateway Modal */}
+      <AnimatePresence>
+        {isPaymentModalOpen && currentPaymentOrder && (
+          <div className="modal-overlay" onClick={() => setIsPaymentModalOpen(false)}>
+            <motion.div 
+              initial={{ y: 50, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 50, opacity: 0 }}
+              onClick={e => e.stopPropagation()}
+              className="modal w-full max-w-md p-0 overflow-hidden"
+            >
+              <div className="p-6 border-b border-[var(--b1)] flex justify-between items-center bg-linear-to-br from-[var(--s2)] to-[var(--s1)]">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-linear-to-br from-[#5c3700] to-[var(--gold)] flex items-center justify-center text-white shadow-lg">
+                    <Smartphone className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-[var(--tx4)] font-bold uppercase tracking-widest mb-0.5">Payment Gateway</div>
+                    <h2 className="fm text-lg text-white">UPI Secure Pay</h2>
+                  </div>
+                </div>
+                <button onClick={() => setIsPaymentModalOpen(false)} className="p-2 hover:bg-[var(--s3)] rounded-xl transition-all text-[var(--tx4)]">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-8 text-center">
+                <div className="mb-8">
+                  <div className="text-[11px] text-[var(--tx4)] font-bold uppercase tracking-widest mb-2">Amount to Pay</div>
+                  <div className="fm text-4xl font-black text-white">₹{currentPaymentOrder.amount.toFixed(2)}</div>
+                  <div className="text-[10px] text-[var(--tx3)] mt-2">Order ID: {currentPaymentOrder.id}</div>
+                </div>
+
+                <div className="relative inline-block p-4 bg-white rounded-3xl mb-8 shadow-2xl">
+                  <img 
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=qwikbrew@bank%26pn=QwikBrew%26am=${currentPaymentOrder.amount}%26cu=INR%26tn=Order%20${currentPaymentOrder.id}`} 
+                    alt="UPI QR Code"
+                    className="w-48 h-48"
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="w-10 h-10 bg-white rounded-lg shadow-lg flex items-center justify-center p-1 border border-gray-100">
+                      <div className="w-full h-full bg-[var(--brand)] rounded-md flex items-center justify-center text-white text-[10px] font-black">QB</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4 mb-8">
+                  <p className="text-xs text-[var(--tx3)] leading-relaxed">
+                    Scan this QR code using any UPI app (GPay, PhonePe, Paytm) to complete your payment.
+                  </p>
+                  <div className="flex justify-center gap-6 opacity-40 grayscale">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/UPI-Logo.png/1200px-UPI-Logo.png" alt="UPI" className="h-4" />
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_Pay_Logo.svg/1200px-Google_Pay_Logo.svg.png" alt="GPay" className="h-4" />
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/7/71/PhonePe_Logo.svg/1200px-PhonePe_Logo.svg.png" alt="PhonePe" className="h-4" />
+                  </div>
+                </div>
+
+                <button 
+                  onClick={() => finalizeOrder(currentPaymentOrder)}
+                  className="w-full bg-linear-to-br from-[var(--brand)] to-[var(--brand-lt)] text-white font-black py-4 rounded-2xl shadow-xl shadow-[var(--brand-gl)] hover:scale-[1.02] active:scale-[0.98] transition-all"
+                >
+                  I've Completed Payment →
+                </button>
+                <button 
+                  onClick={() => setIsPaymentModalOpen(false)}
+                  className="w-full mt-4 py-2 text-[10px] font-bold text-[var(--tx4)] hover:text-white transition-colors uppercase tracking-widest"
+                >
+                  Cancel Transaction
+                </button>
+              </div>
+
+              <div className="p-4 bg-[var(--s2)] border-t border-[var(--b1)] text-center">
+                <div className="flex items-center justify-center gap-2 text-[9px] text-[var(--tx4)] font-bold uppercase tracking-widest">
+                  <div className="w-1 h-1 rounded-full bg-green-500" />
+                  SSL Encrypted · PCI DSS Compliant
+                </div>
+              </div>
             </motion.div>
           </div>
         )}
