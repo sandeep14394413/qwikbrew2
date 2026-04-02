@@ -103,6 +103,10 @@ export default function App() {
   const [walletBal, setWalletBal] = useState(500);
   const [search, setSearch] = useState('');
   const [selectedCat, setSelectedCat] = useState('All');
+  const [maxPrice, setMaxPrice] = useState(200);
+  const [dietaryFilter, setDietaryFilter] = useState<'All' | 'Veg' | 'Non-Veg'>('All');
+  const [maxPrepTime, setMaxPrepTime] = useState(30);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [isWalletOpen, setIsWalletOpen] = useState(false);
@@ -274,9 +278,12 @@ export default function App() {
     return MENU_DATA.filter(item => {
       const matchesCat = selectedCat === 'All' || item.category === selectedCat;
       const matchesSearch = item.name.toLowerCase().includes(search.toLowerCase());
-      return matchesCat && matchesSearch;
+      const matchesPrice = item.price <= maxPrice;
+      const matchesDietary = dietaryFilter === 'All' || (dietaryFilter === 'Veg' ? item.isVeg : !item.isVeg);
+      const matchesPrep = item.preparationTime <= maxPrepTime;
+      return matchesCat && matchesSearch && matchesPrice && matchesDietary && matchesPrep;
     });
-  }, [selectedCat, search]);
+  }, [selectedCat, search, maxPrice, dietaryFilter, maxPrepTime]);
 
   const addToCart = (item: FoodItem) => {
     setCart(prev => {
@@ -502,15 +509,26 @@ export default function App() {
         <header className="topbar">
           <div className="fd text-lg flex-1 text-[var(--tx)]">{page === 'menu' ? 'Menu' : page === 'orders' ? 'My Orders' : 'Profile'}</div>
           {page === 'menu' && (
-            <div className="relative w-80">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--tx4)]" />
-              <input 
-                type="text" 
-                placeholder="Search menu items..."
-                className="w-full bg-[var(--s2)] border border-[var(--b1)] rounded-full pl-10 pr-4 py-2 text-xs text-white focus:border-[var(--brand)] transition-all outline-none"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
+            <div className="flex items-center gap-3 flex-1 max-w-xl">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--tx4)]" />
+                <input 
+                  type="text" 
+                  placeholder="Search menu items..."
+                  className="w-full bg-[var(--s2)] border border-[var(--b1)] rounded-full pl-10 pr-4 py-2 text-xs text-[var(--tx)] focus:border-[var(--brand)] transition-all outline-none"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+              <button 
+                onClick={() => setIsFilterOpen(!isFilterOpen)}
+                className={`p-2 rounded-full border transition-all flex items-center justify-center gap-2 px-4 text-[10px] font-bold uppercase tracking-widest ${
+                  isFilterOpen ? 'bg-[var(--brand)] border-[var(--brand)] text-white' : 'bg-[var(--s2)] border-[var(--b1)] text-[var(--tx3)] hover:border-[var(--brand)]'
+                }`}
+              >
+                <Star className={`w-3.5 h-3.5 ${isFilterOpen ? 'fill-current' : ''}`} />
+                Filters
+              </button>
             </div>
           )}
           <div className="flex items-center gap-3">
@@ -547,6 +565,78 @@ export default function App() {
           <div className="flex-1 overflow-y-auto p-7 no-scrollbar">
             {page === 'menu' && (
               <div className="space-y-6">
+                <AnimatePresence>
+                  {isFilterOpen && (
+                    <motion.div 
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="bg-[var(--s1)] border border-[var(--b1)] rounded-3xl p-6 mb-6 grid grid-cols-1 md:grid-cols-3 gap-8">
+                        <div>
+                          <div className="flex justify-between items-center mb-4">
+                            <label className="text-[10px] font-bold text-[var(--tx4)] uppercase tracking-widest">Price Range</label>
+                            <span className="fm text-xs text-[var(--brand-xlt)] font-bold">Up to ₹{maxPrice}</span>
+                          </div>
+                          <input 
+                            type="range" 
+                            min="20" 
+                            max="500" 
+                            step="10"
+                            value={maxPrice}
+                            onChange={(e) => setMaxPrice(Number(e.target.value))}
+                            className="w-full accent-[var(--brand)] h-1.5 bg-[var(--s3)] rounded-full appearance-none cursor-pointer"
+                          />
+                          <div className="flex justify-between mt-2 text-[8px] text-[var(--tx4)] font-bold uppercase">
+                            <span>₹20</span>
+                            <span>₹500</span>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-[var(--tx4)] uppercase tracking-widest mb-4">Dietary Preference</label>
+                          <div className="flex gap-2">
+                            {['All', 'Veg', 'Non-Veg'].map(d => (
+                              <button
+                                key={d}
+                                onClick={() => setDietaryFilter(d as any)}
+                                className={`flex-1 py-2 rounded-xl text-[10px] font-bold transition-all border ${
+                                  dietaryFilter === d 
+                                    ? 'bg-[var(--brand-gl3)] border-[var(--brand)] text-[var(--brand)]' 
+                                    : 'bg-[var(--s2)] border-[var(--b1)] text-[var(--tx3)] hover:border-[var(--b2)]'
+                                }`}
+                              >
+                                {d}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="flex justify-between items-center mb-4">
+                            <label className="text-[10px] font-bold text-[var(--tx4)] uppercase tracking-widest">Prep Time</label>
+                            <span className="fm text-xs text-[var(--gold-lt)] font-bold">Under {maxPrepTime} mins</span>
+                          </div>
+                          <input 
+                            type="range" 
+                            min="3" 
+                            max="60" 
+                            step="1"
+                            value={maxPrepTime}
+                            onChange={(e) => setMaxPrepTime(Number(e.target.value))}
+                            className="w-full accent-[var(--gold)] h-1.5 bg-[var(--s3)] rounded-full appearance-none cursor-pointer"
+                          />
+                          <div className="flex justify-between mt-2 text-[8px] text-[var(--tx4)] font-bold uppercase">
+                            <span>3m</span>
+                            <span>60m</span>
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
                 <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
                   {CATEGORIES.map(cat => (
                     <button
@@ -565,81 +655,106 @@ export default function App() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
                   <AnimatePresence mode="popLayout">
-                    {filteredMenu.map((item, idx) => (
+                    {filteredMenu.length > 0 ? (
+                      filteredMenu.map((item, idx) => (
+                        <motion.div 
+                          key={item.id}
+                          layout
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 0.9 }}
+                          transition={{ delay: idx * 0.05 }}
+                          className="mcard"
+                        >
+                          <div className="mc-imgwrap">
+                            <img 
+                              src={item.image} 
+                              alt={item.name} 
+                              className="mc-img" 
+                              referrerPolicy="no-referrer"
+                            />
+                            <div className="absolute inset-0 bg-linear-to-t from-black/60 to-transparent opacity-70" />
+                            <div className="absolute top-3 left-3 flex gap-2">
+                              <span className={`mc-tag ${item.isVeg ? 'bg-green-500/80' : 'bg-red-500/80'} text-white`}>
+                                {item.isVeg ? '● Veg' : '● Non-Veg'}
+                              </span>
+                              {item.rating >= 4.7 && <span className="mc-tag bg-orange-500/90 text-black font-black">⭐ Top Pick</span>}
+                            </div>
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleWishlist(item.id);
+                              }}
+                              className={`absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-md border transition-all ${
+                                wishlist.includes(item.id) 
+                                  ? 'bg-red-500 border-red-400 text-white shadow-lg shadow-red-500/20' 
+                                  : 'bg-black/40 border-white/10 text-white hover:bg-black/60'
+                              }`}
+                            >
+                              <Star className={`w-4 h-4 ${wishlist.includes(item.id) ? 'fill-current' : ''}`} />
+                            </button>
+                            <div className="absolute bottom-3 right-3 bg-black/50 backdrop-blur-md border border-white/10 px-2.5 py-1 rounded-full text-[11px] font-bold text-[var(--gold-lt)]">
+                              ★ {item.rating}
+                            </div>
+                          </div>
+                          <div className="p-4">
+                            <div className="flex justify-between items-center mb-1">
+                              <span className="text-[10px] text-[var(--tx4)] font-mono bg-[var(--s3)] px-2 py-0.5 rounded-full border border-[var(--b1)]">
+                                ⏱ {item.preparationTime} min
+                              </span>
+                            </div>
+                            <div className="fd text-base mb-1 text-[var(--tx)]">{item.name}</div>
+                            <p className="text-[11px] text-[var(--tx3)] line-clamp-2 mb-4 h-9">{item.description}</p>
+                            <div className="flex justify-between items-center">
+                              <div className="fm text-lg">
+                                <span className="text-xs text-[var(--brand-xlt)] mr-1">₹</span>
+                                <span className="bg-linear-to-r from-[var(--brand-xlt)] to-[var(--gold-lt)] bg-clip-text text-transparent">{item.price}</span>
+                              </div>
+                              {cart.find(c => c.id === item.id) ? (
+                                <div className="flex items-center gap-3 bg-[var(--brand-gl3)] border border-[rgba(255,87,34,.2)] rounded-full px-2 py-1">
+                                  <button onClick={() => removeFromCart(item.id)} className="w-7 h-7 rounded-full bg-[var(--s2)] flex items-center justify-center text-[var(--brand)] hover:bg-[var(--brand)] hover:text-white transition-all">
+                                    <Minus className="w-3 h-3" />
+                                  </button>
+                                  <span className="fm text-xs font-bold w-4 text-center text-[var(--tx)]">{cart.find(c => c.id === item.id)?.qty}</span>
+                                  <button onClick={() => addToCart(item)} className="w-7 h-7 rounded-full bg-[var(--s2)] flex items-center justify-center text-[var(--brand)] hover:bg-[var(--brand)] hover:text-white transition-all">
+                                    <Plus className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <button 
+                                  onClick={() => addToCart(item)}
+                                  className="w-9 h-9 rounded-full bg-linear-to-br from-[var(--brand)] to-[var(--brand-lt)] text-white flex items-center justify-center shadow-lg shadow-[rgba(255,87,34,.3)] hover:scale-110 transition-all"
+                                >
+                                  <Plus className="w-5 h-5" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </motion.div>
+                      ))
+                    ) : (
                       <motion.div 
-                        key={item.id}
-                        layout
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: idx * 0.05 }}
-                        className="mcard"
+                        className="col-span-full py-20 flex flex-col items-center justify-center text-center bg-[var(--s1)] border border-dashed border-[var(--b1)] rounded-[32px]"
                       >
-                        <div className="mc-imgwrap">
-                          <img 
-                            src={item.image} 
-                            alt={item.name} 
-                            className="mc-img" 
-                            referrerPolicy="no-referrer"
-                          />
-                          <div className="absolute inset-0 bg-linear-to-t from-black/60 to-transparent opacity-70" />
-                          <div className="absolute top-3 left-3 flex gap-2">
-                            <span className={`mc-tag ${item.isVeg ? 'bg-green-500/80' : 'bg-red-500/80'} text-white`}>
-                              {item.isVeg ? '● Veg' : '● Non-Veg'}
-                            </span>
-                            {item.rating >= 4.7 && <span className="mc-tag bg-orange-500/90 text-black font-black">⭐ Top Pick</span>}
-                          </div>
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleWishlist(item.id);
-                            }}
-                            className={`absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-md border transition-all ${
-                              wishlist.includes(item.id) 
-                                ? 'bg-red-500 border-red-400 text-white shadow-lg shadow-red-500/20' 
-                                : 'bg-black/40 border-white/10 text-white hover:bg-black/60'
-                            }`}
-                          >
-                            <Star className={`w-4 h-4 ${wishlist.includes(item.id) ? 'fill-current' : ''}`} />
-                          </button>
-                          <div className="absolute bottom-3 right-3 bg-black/50 backdrop-blur-md border border-white/10 px-2.5 py-1 rounded-full text-[11px] font-bold text-[var(--gold-lt)]">
-                            ★ {item.rating}
-                          </div>
-                        </div>
-                        <div className="p-4">
-                          <div className="flex justify-between items-center mb-1">
-                            <span className="text-[10px] text-[var(--tx4)] font-mono bg-[var(--s3)] px-2 py-0.5 rounded-full border border-[var(--b1)]">
-                              ⏱ {item.preparationTime} min
-                            </span>
-                          </div>
-                          <div className="fd text-base mb-1 text-white">{item.name}</div>
-                          <p className="text-[11px] text-[var(--tx3)] line-clamp-2 mb-4 h-9">{item.description}</p>
-                          <div className="flex justify-between items-center">
-                            <div className="fm text-lg">
-                              <span className="text-xs text-[var(--brand-xlt)] mr-1">₹</span>
-                              <span className="bg-linear-to-r from-[var(--brand-xlt)] to-[var(--gold-lt)] bg-clip-text text-transparent">{item.price}</span>
-                            </div>
-                            {cart.find(c => c.id === item.id) ? (
-                              <div className="flex items-center gap-3 bg-[var(--brand-gl3)] border border-[rgba(255,87,34,.2)] rounded-full px-2 py-1">
-                                <button onClick={() => removeFromCart(item.id)} className="w-7 h-7 rounded-full bg-[var(--s2)] flex items-center justify-center text-[var(--brand)] hover:bg-[var(--brand)] hover:text-white transition-all">
-                                  <Minus className="w-3 h-3" />
-                                </button>
-                                <span className="fm text-xs font-bold w-4 text-center text-white">{cart.find(c => c.id === item.id)?.qty}</span>
-                                <button onClick={() => addToCart(item)} className="w-7 h-7 rounded-full bg-[var(--s2)] flex items-center justify-center text-[var(--brand)] hover:bg-[var(--brand)] hover:text-white transition-all">
-                                  <Plus className="w-3 h-3" />
-                                </button>
-                              </div>
-                            ) : (
-                              <button 
-                                onClick={() => addToCart(item)}
-                                className="w-9 h-9 rounded-full bg-linear-to-br from-[var(--brand)] to-[var(--brand-lt)] text-white flex items-center justify-center shadow-lg shadow-[rgba(255,87,34,.3)] hover:scale-110 transition-all"
-                              >
-                                <Plus className="w-5 h-5" />
-                              </button>
-                            )}
-                          </div>
-                        </div>
+                        <div className="text-5xl mb-4 opacity-50">🔍</div>
+                        <h3 className="fd text-xl text-[var(--tx)] mb-2">No items match your filters</h3>
+                        <p className="text-xs text-[var(--tx3)] mb-6">Try adjusting your filters or search term to find what you're looking for.</p>
+                        <button 
+                          onClick={() => {
+                            setSearch('');
+                            setMaxPrice(500);
+                            setDietaryFilter('All');
+                            setMaxPrepTime(60);
+                            setSelectedCat('All');
+                          }}
+                          className="text-[10px] font-bold text-[var(--brand)] hover:underline uppercase tracking-widest"
+                        >
+                          Reset All Filters
+                        </button>
                       </motion.div>
-                    ))}
+                    )}
                   </AnimatePresence>
                 </div>
               </div>
