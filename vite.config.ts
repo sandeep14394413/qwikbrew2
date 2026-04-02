@@ -8,7 +8,7 @@ export default defineConfig(({mode}) => {
   return {
     plugins: [react(), tailwindcss()],
     // If you're hosting on GitHub Pages (e.g., https://username.github.io/repo-name/),
-    // set base to '/repo-name/'. For custom domains or root hosting, use '/'.
+    base: '/qwikbrew2/',. For custom domains or root hosting, use '/'.
     base: process.env.VITE_BASE_PATH || '/',
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
