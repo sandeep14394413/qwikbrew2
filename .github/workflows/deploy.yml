@@ -1,4 +1,3 @@
-# Simple GitHub Pages Deployment Workflow
 name: Deploy to GitHub Pages
 
 on:
@@ -21,24 +20,36 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # ✅ FIX: Removed cache
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
+
+      # ✅ Works without lock file
       - name: Install dependencies
         run: npm install
+
       - name: Build
         run: npm run build
+
+      # ✅ SPA fix (important)
+      - name: Fix SPA Routing
+        run: cp dist/index.html dist/404.html
+
       - name: Setup Pages
         uses: actions/configure-pages@v4
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: './dist'
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
