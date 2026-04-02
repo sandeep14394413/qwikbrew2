@@ -1,20 +1,48 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# QwikBrew — Corporate Café Portal
 
-# Run and deploy your AI Studio app
+QwikBrew is a premium, high-performance corporate café application designed for modern workplaces. It features real-time order tracking, a digital wallet system, and a seamless checkout experience.
 
-This contains everything you need to run your app locally.
+## 🚀 Features
 
-View your app in AI Studio: https://ai.studio/apps/bd6c94c8-0737-465c-afc6-43c741da8d77
+- **Real-time Order Tracking**: Monitor your order from preparation to delivery with live status updates.
+- **Corporate Wallet**: Instant recharges and secure payments using your employee wallet.
+- **Wishlist**: Save your favorite brews and snacks for later.
+- **Push Notifications**: Stay updated on order status, promotions, and loyalty rewards.
+- **Discount Codes**: Apply promo codes like `QWIKBREW10` for exclusive savings.
+- **Multi-Payment Support**: Pay via Wallet, UPI, Card, or Net Banking.
+- **Order Cancellation**: Cancel orders in 'Preparing' or 'In Kitchen' status with automatic refunds.
 
-## Run Locally
+## 🛠️ Tech Stack
 
-**Prerequisites:**  Node.js
+- **Frontend**: React 19, TypeScript
+- **Styling**: Tailwind CSS 4
+- **Animations**: Framer Motion
+- **Icons**: Lucide React
+- **Build Tool**: Vite
 
+## 📦 Getting Started
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+1. **Clone the repository**:
+   ```bash
+   git clone <your-repo-url>
+   cd qwikbrew
+   ```
+
+2. **Install dependencies**:
+   ```bash
+   npm install
+   ```
+
+3. **Run the development server**:
+   ```bash
+   npm run dev
+   ```
+
+4. **Build for production**:
+   ```bash
+   npm run build
+   ```
+
+## 📝 License
+
+This project is for demonstration purposes.
