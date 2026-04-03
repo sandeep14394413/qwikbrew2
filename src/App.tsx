@@ -122,7 +122,7 @@ export default function App() {
   const [currentPaymentOrder, setCurrentPaymentOrder] = useState<{ id: string; amount: number } | null>(null);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     const saved = localStorage.getItem('qwikbrew-theme');
-    return (saved as 'light' | 'dark') || 'dark';
+    return (saved as 'light' | 'dark') || 'light';
   });
   const [orders, setOrders] = useState<Order[]>([
     { 
@@ -164,37 +164,48 @@ export default function App() {
 
   // Load notification preference
   useEffect(() => {
-    const saved = localStorage.getItem('qb_notifications');
-    if (saved === 'true' && Notification.permission === 'granted') {
-      setNotificationsEnabled(true);
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      const saved = localStorage.getItem('qb_notifications');
+      if (saved === 'true' && Notification.permission === 'granted') {
+        setNotificationsEnabled(true);
+      }
     }
   }, []);
 
   const sendNotification = useCallback((title: string, body: string) => {
-    if (notificationsEnabled && Notification.permission === 'granted') {
-      new Notification(title, {
-        body,
-        icon: 'https://picsum.photos/seed/coffee/100/100'
-      });
+    if (notificationsEnabled && typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+      try {
+        new Notification(title, {
+          body,
+          icon: 'https://picsum.photos/seed/coffee/100/100'
+        });
+      } catch (e) {
+        console.error('Notification error:', e);
+      }
     }
   }, [notificationsEnabled]);
 
   const requestNotificationPermission = async () => {
-    if (!('Notification' in window)) {
+    if (typeof window === 'undefined' || !('Notification' in window)) {
       showToast('Notifications not supported in this browser', 'error');
       return;
     }
 
-    const permission = await Notification.requestPermission();
-    if (permission === 'granted') {
-      setNotificationsEnabled(true);
-      localStorage.setItem('qb_notifications', 'true');
-      showToast('Notifications enabled!', 'success');
-      sendNotification('QwikBrew', 'You will now receive updates about your orders.');
-    } else {
-      setNotificationsEnabled(false);
-      localStorage.setItem('qb_notifications', 'false');
-      showToast('Notification permission denied', 'error');
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission === 'granted') {
+        setNotificationsEnabled(true);
+        localStorage.setItem('qb_notifications', 'true');
+        showToast('Notifications enabled!', 'success');
+        sendNotification('QwikBrew', 'You will now receive updates about your orders.');
+      } else {
+        setNotificationsEnabled(false);
+        localStorage.setItem('qb_notifications', 'false');
+        showToast('Notification permission denied', 'error');
+      }
+    } catch (e) {
+      console.error('Permission request error:', e);
+      showToast('Could not request notification permission', 'error');
     }
   };
 
@@ -424,7 +435,7 @@ export default function App() {
               <input 
                 type="email" 
                 defaultValue="sandeep@company.com"
-                className="w-full bg-[var(--s2)] border border-[var(--b1)] rounded-xl px-4 py-3 text-sm text-white focus:border-[var(--brand)] transition-all outline-none"
+                className="w-full bg-[var(--s2)] border border-[var(--b1)] rounded-xl px-4 py-3 text-sm text-[var(--tx)] focus:border-[var(--brand)] transition-all outline-none"
                 placeholder="you@company.com"
               />
             </div>
@@ -433,7 +444,7 @@ export default function App() {
               <input 
                 type="password" 
                 defaultValue="password"
-                className="w-full bg-[var(--s2)] border border-[var(--b1)] rounded-xl px-4 py-3 text-sm text-white focus:border-[var(--brand)] transition-all outline-none"
+                className="w-full bg-[var(--s2)] border border-[var(--b1)] rounded-xl px-4 py-3 text-sm text-[var(--tx)] focus:border-[var(--brand)] transition-all outline-none"
                 placeholder="••••••••"
               />
             </div>
@@ -457,12 +468,16 @@ export default function App() {
           </div>
         </div>
 
-        <div className="sb-wallet" onClick={() => setIsWalletOpen(true)}>
-          <div className="text-[9px] text-[rgba(232,160,0,.5)] font-bold uppercase tracking-widest mb-1">Café Wallet</div>
-          <div className="fd text-2xl text-[var(--gold-lt)]">₹{walletBal.toFixed(2)}</div>
-          <div className="text-[10px] text-[rgba(232,160,0,.4)] mt-1">{user.name.split(' ')[0]}'s balance</div>
-          <button className="mt-3 text-[10px] font-bold text-[var(--gold-lt)] bg-[rgba(232,160,0,.12)] border border-[rgba(232,160,0,.22)] px-3 py-1.5 rounded-full hover:bg-[rgba(232,160,0,.2)] transition-all">
-            + Recharge
+        <div className="sb-wallet group" onClick={() => setIsWalletOpen(true)}>
+          <div className="absolute top-0 right-0 p-3 opacity-20 group-hover:opacity-40 transition-opacity">
+            <Wallet className="w-8 h-8 rotate-12" />
+          </div>
+          <div className="text-[9px] text-[rgba(232,160,0,.6)] font-bold uppercase tracking-widest mb-1">Café Wallet</div>
+          <div className="fm text-2xl text-[var(--gold-lt)] font-bold">₹{walletBal.toFixed(2)}</div>
+          <div className="text-[10px] text-[rgba(232,160,0,.5)] mt-1 font-medium italic">Available Balance</div>
+          <button className="mt-4 w-full text-[10px] font-bold text-[var(--gold-lt)] bg-[rgba(232,160,0,.1)] border border-[rgba(232,160,0,.2)] py-2 rounded-xl hover:bg-[rgba(232,160,0,.2)] transition-all flex items-center justify-center gap-2">
+            <Plus className="w-3 h-3" />
+            Recharge Wallet
           </button>
         </div>
 
@@ -507,53 +522,62 @@ export default function App() {
       {/* Main Content */}
       <main className="main">
         <header className="topbar">
-          <div className="fd text-lg flex-1 text-[var(--tx)]">{page === 'menu' ? 'Menu' : page === 'orders' ? 'My Orders' : 'Profile'}</div>
+          <div className="fd text-xl flex-1 text-[var(--tx)] tracking-tight">
+            {page === 'menu' ? 'Discover Menu' : page === 'orders' ? 'Order History' : 'Account Profile'}
+          </div>
+          
           {page === 'menu' && (
-            <div className="flex items-center gap-3 flex-1 max-w-xl">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--tx4)]" />
+            <div className="flex items-center gap-4 flex-1 max-w-2xl">
+              <div className="search-wrap flex-1">
+                <Search className="w-4 h-4 text-[var(--tx4)]" />
                 <input 
                   type="text" 
-                  placeholder="Search menu items..."
-                  className="w-full bg-[var(--s2)] border border-[var(--b1)] rounded-full pl-10 pr-4 py-2 text-xs text-[var(--tx)] focus:border-[var(--brand)] transition-all outline-none"
+                  placeholder="What are you craving today?"
+                  className="bg-transparent border-none text-xs text-[var(--tx)] focus:outline-none w-full font-medium"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
+                {search && (
+                  <button onClick={() => setSearch('')} className="text-[var(--tx4)] hover:text-[var(--tx)]">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
+              
               <button 
                 onClick={() => setIsFilterOpen(!isFilterOpen)}
-                className={`p-2 rounded-full border transition-all flex items-center justify-center gap-2 px-4 text-[10px] font-bold uppercase tracking-widest ${
-                  isFilterOpen ? 'bg-[var(--brand)] border-[var(--brand)] text-white' : 'bg-[var(--s2)] border-[var(--b1)] text-[var(--tx3)] hover:border-[var(--brand)]'
+                className={`flex items-center gap-2 px-4 py-2 rounded-2xl border text-[10px] font-bold uppercase tracking-widest transition-all ${
+                  isFilterOpen 
+                    ? 'bg-[var(--brand)] border-[var(--brand)] text-white shadow-lg shadow-[var(--brand-gl)]' 
+                    : 'bg-[var(--glass)] border-[var(--b1)] text-[var(--tx3)] hover:border-[var(--brand)]'
                 }`}
               >
                 <Star className={`w-3.5 h-3.5 ${isFilterOpen ? 'fill-current' : ''}`} />
-                Filters
+                Refine
               </button>
             </div>
           )}
-          <div className="flex items-center gap-3">
+
+          <div className="flex items-center gap-3 ml-4">
             <button 
               onClick={toggleTheme}
-              className="p-2 bg-[var(--s2)] border border-[var(--b1)] rounded-full text-[var(--tx3)] hover:text-[var(--brand)] transition-all relative group"
-              title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+              className="p-2.5 bg-[var(--glass)] border border-[var(--b1)] rounded-xl text-[var(--tx3)] hover:text-[var(--brand)] transition-all"
             >
               {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
             </button>
 
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-[var(--s2)] border border-[var(--b1)] rounded-full text-[10px] font-bold text-white">
-              <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse shadow-[0_0_6px_rgba(74,222,128,.6)]" />
-              Café Open
+            <div className="hidden lg:flex items-center gap-2 px-4 py-2 bg-[var(--glass)] border border-[var(--b1)] rounded-xl">
+              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--tx2)]">Café Live</span>
             </div>
-            <div className="px-3 py-1.5 bg-[var(--s2)] border border-[var(--b1)] rounded-full text-[10px] font-bold text-[var(--gold-lt)]">
-              ₹{walletBal.toFixed(2)}
-            </div>
+
             <button 
               onClick={() => setIsCartOpen(true)}
-              className="relative p-2 bg-[var(--s2)] border border-[var(--b1)] rounded-full text-[var(--tx3)] hover:text-[var(--brand)] transition-all"
+              className="relative p-2.5 bg-[var(--glass)] border border-[var(--b1)] rounded-xl text-[var(--tx3)] hover:text-[var(--brand)] transition-all"
             >
-              <ShoppingCart className="w-5 h-5" />
+              <ShoppingCart className="w-4 h-4" />
               {cart.length > 0 && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-[var(--brand)] text-white text-[10px] font-black rounded-full flex items-center justify-center shadow-lg">
+                <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-[var(--brand)] text-white text-[10px] font-black rounded-lg flex items-center justify-center shadow-lg border-2 border-[var(--bg)]">
                   {cart.reduce((s, i) => s + i.qty, 0)}
                 </span>
               )}
@@ -568,16 +592,16 @@ export default function App() {
                 <AnimatePresence>
                   {isFilterOpen && (
                     <motion.div 
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
+                      initial={{ height: 0, opacity: 0, marginBottom: 0 }}
+                      animate={{ height: 'auto', opacity: 1, marginBottom: 24 }}
+                      exit={{ height: 0, opacity: 0, marginBottom: 0 }}
                       className="overflow-hidden"
                     >
-                      <div className="bg-[var(--s1)] border border-[var(--b1)] rounded-3xl p-6 mb-6 grid grid-cols-1 md:grid-cols-3 gap-8">
+                      <div className="bg-[var(--s1)] border border-[var(--b1)] rounded-[32px] p-8 grid grid-cols-1 md:grid-cols-3 gap-10 shadow-xl">
                         <div>
-                          <div className="flex justify-between items-center mb-4">
-                            <label className="text-[10px] font-bold text-[var(--tx4)] uppercase tracking-widest">Price Range</label>
-                            <span className="fm text-xs text-[var(--brand-xlt)] font-bold">Up to ₹{maxPrice}</span>
+                          <div className="flex justify-between items-center mb-5">
+                            <label className="text-[10px] font-bold text-[var(--tx4)] uppercase tracking-widest">Price Threshold</label>
+                            <span className="fm text-xs text-[var(--brand-xlt)] font-bold">₹{maxPrice}</span>
                           </div>
                           <input 
                             type="range" 
@@ -588,23 +612,23 @@ export default function App() {
                             onChange={(e) => setMaxPrice(Number(e.target.value))}
                             className="w-full accent-[var(--brand)] h-1.5 bg-[var(--s3)] rounded-full appearance-none cursor-pointer"
                           />
-                          <div className="flex justify-between mt-2 text-[8px] text-[var(--tx4)] font-bold uppercase">
-                            <span>₹20</span>
-                            <span>₹500</span>
+                          <div className="flex justify-between mt-3 text-[8px] text-[var(--tx4)] font-bold uppercase tracking-tighter">
+                            <span>Min (₹20)</span>
+                            <span>Max (₹500)</span>
                           </div>
                         </div>
 
                         <div>
-                          <label className="block text-[10px] font-bold text-[var(--tx4)] uppercase tracking-widest mb-4">Dietary Preference</label>
+                          <label className="block text-[10px] font-bold text-[var(--tx4)] uppercase tracking-widest mb-5">Dietary Filter</label>
                           <div className="flex gap-2">
                             {['All', 'Veg', 'Non-Veg'].map(d => (
                               <button
                                 key={d}
                                 onClick={() => setDietaryFilter(d as any)}
-                                className={`flex-1 py-2 rounded-xl text-[10px] font-bold transition-all border ${
+                                className={`flex-1 py-2.5 rounded-xl text-[10px] font-bold uppercase transition-all border ${
                                   dietaryFilter === d 
-                                    ? 'bg-[var(--brand-gl3)] border-[var(--brand)] text-[var(--brand)]' 
-                                    : 'bg-[var(--s2)] border-[var(--b1)] text-[var(--tx3)] hover:border-[var(--b2)]'
+                                    ? 'bg-[var(--brand-gl)] border-[var(--brand)] text-[var(--brand-xlt)]' 
+                                    : 'bg-[var(--s2)] border-[var(--b1)] text-[var(--tx3)] hover:border-[var(--tx4)]'
                                 }`}
                               >
                                 {d}
@@ -614,22 +638,22 @@ export default function App() {
                         </div>
 
                         <div>
-                          <div className="flex justify-between items-center mb-4">
+                          <div className="flex justify-between items-center mb-5">
                             <label className="text-[10px] font-bold text-[var(--tx4)] uppercase tracking-widest">Prep Time</label>
-                            <span className="fm text-xs text-[var(--gold-lt)] font-bold">Under {maxPrepTime} mins</span>
+                            <span className="fm text-xs text-[var(--brand-xlt)] font-bold">{maxPrepTime} mins</span>
                           </div>
                           <input 
                             type="range" 
-                            min="3" 
-                            max="60" 
-                            step="1"
+                            min="5" 
+                            max="45" 
+                            step="5"
                             value={maxPrepTime}
                             onChange={(e) => setMaxPrepTime(Number(e.target.value))}
-                            className="w-full accent-[var(--gold)] h-1.5 bg-[var(--s3)] rounded-full appearance-none cursor-pointer"
+                            className="w-full accent-[var(--brand)] h-1.5 bg-[var(--s3)] rounded-full appearance-none cursor-pointer"
                           />
-                          <div className="flex justify-between mt-2 text-[8px] text-[var(--tx4)] font-bold uppercase">
-                            <span>3m</span>
-                            <span>60m</span>
+                          <div className="flex justify-between mt-3 text-[8px] text-[var(--tx4)] font-bold uppercase tracking-tighter">
+                            <span>Quick (5m)</span>
+                            <span>Relaxed (45m)</span>
                           </div>
                         </div>
                       </div>
@@ -637,23 +661,20 @@ export default function App() {
                   )}
                 </AnimatePresence>
 
-                <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
+                {/* Category Bar */}
+                <div className="flex items-center gap-3 overflow-x-auto no-scrollbar pb-2">
                   {CATEGORIES.map(cat => (
                     <button
                       key={cat}
                       onClick={() => setSelectedCat(cat)}
-                      className={`px-5 py-2 rounded-full text-xs font-bold transition-all border ${
-                        selectedCat === cat 
-                          ? 'bg-linear-to-br from-[var(--brand)] to-[var(--brand-lt)] border-transparent text-white shadow-xl' 
-                          : 'bg-[var(--s1)] border-[var(--b1)] text-[var(--tx3)] hover:border-[var(--b2)]'
-                      }`}
+                      className={`filter-chip ${selectedCat === cat ? 'active' : ''}`}
                     >
                       {cat}
                     </button>
                   ))}
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                <div className="bento-grid !p-0">
                   <AnimatePresence mode="popLayout">
                     {filteredMenu.length > 0 ? (
                       filteredMenu.map((item, idx) => (
@@ -664,70 +685,55 @@ export default function App() {
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, scale: 0.9 }}
                           transition={{ delay: idx * 0.05 }}
-                          className="mcard"
+                          className="mcard group"
                         >
                           <div className="mc-imgwrap">
-                            <img 
-                              src={item.image} 
-                              alt={item.name} 
-                              className="mc-img" 
-                              referrerPolicy="no-referrer"
-                            />
-                            <div className="absolute inset-0 bg-linear-to-t from-black/60 to-transparent opacity-70" />
+                            <img src={item.image} alt={item.name} className="mc-img" referrerPolicy="no-referrer" />
+                            <div className="absolute inset-0 bg-linear-to-t from-black/80 via-transparent to-transparent opacity-60" />
                             <div className="absolute top-3 left-3 flex gap-2">
-                              <span className={`mc-tag ${item.isVeg ? 'bg-green-500/80' : 'bg-red-500/80'} text-white`}>
-                                {item.isVeg ? '● Veg' : '● Non-Veg'}
-                              </span>
-                              {item.rating >= 4.7 && <span className="mc-tag bg-orange-500/90 text-black font-black">⭐ Top Pick</span>}
+                              <div className={`mc-tag ${item.isVeg ? 'bg-green-500/20 text-green-400 border-green-500/30' : 'bg-red-500/20 text-red-400 border-red-500/30'}`}>
+                                {item.isVeg ? 'Veg' : 'Non-Veg'}
+                              </div>
+                              <div className="mc-tag bg-[var(--s4)]/60 text-[var(--tx)] flex items-center gap-1">
+                                <Star className="w-2.5 h-2.5 fill-yellow-500 text-yellow-500" />
+                                {item.rating}
+                              </div>
                             </div>
                             <button 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleWishlist(item.id);
-                              }}
-                              className={`absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-md border transition-all ${
-                                wishlist.includes(item.id) 
-                                  ? 'bg-red-500 border-red-400 text-white shadow-lg shadow-red-500/20' 
-                                  : 'bg-black/40 border-white/10 text-white hover:bg-black/60'
+                              onClick={(e) => { e.stopPropagation(); toggleWishlist(item.id); }}
+                              className={`absolute top-3 right-3 p-2 rounded-xl backdrop-blur-md transition-all ${
+                                wishlist.includes(item.id) ? 'bg-red-500 text-white' : 'bg-[var(--s3)] text-[var(--tx3)] hover:bg-[var(--s4)]'
                               }`}
                             >
                               <Star className={`w-4 h-4 ${wishlist.includes(item.id) ? 'fill-current' : ''}`} />
                             </button>
-                            <div className="absolute bottom-3 right-3 bg-black/50 backdrop-blur-md border border-white/10 px-2.5 py-1 rounded-full text-[11px] font-bold text-[var(--gold-lt)]">
-                              ★ {item.rating}
-                            </div>
+                            
+                            <button 
+                              onClick={() => addToCart(item)}
+                              className="quick-add"
+                            >
+                              <Plus className="w-5 h-5" />
+                            </button>
                           </div>
-                          <div className="p-4">
-                            <div className="flex justify-between items-center mb-1">
-                              <span className="text-[10px] text-[var(--tx4)] font-mono bg-[var(--s3)] px-2 py-0.5 rounded-full border border-[var(--b1)]">
-                                ⏱ {item.preparationTime} min
-                              </span>
+                          
+                          <div className="p-5">
+                            <div className="flex justify-between items-start mb-2">
+                              <h3 className="fd text-xl text-[var(--tx)] leading-tight">{item.name}</h3>
+                              <div className="fm text-lg font-bold text-[var(--brand-xlt)]">₹{item.price}</div>
                             </div>
-                            <div className="fd text-base mb-1 text-[var(--tx)]">{item.name}</div>
-                            <p className="text-[11px] text-[var(--tx3)] line-clamp-2 mb-4 h-9">{item.description}</p>
-                            <div className="flex justify-between items-center">
-                              <div className="fm text-lg">
-                                <span className="text-xs text-[var(--brand-xlt)] mr-1">₹</span>
-                                <span className="bg-linear-to-r from-[var(--brand-xlt)] to-[var(--gold-lt)] bg-clip-text text-transparent">{item.price}</span>
+                            <p className="text-[11px] text-[var(--tx3)] line-clamp-2 mb-4 leading-relaxed">{item.description}</p>
+                            
+                            <div className="flex items-center justify-between pt-4 border-t border-[var(--b1)]">
+                              <div className="flex items-center gap-1.5 text-[10px] font-bold text-[var(--tx4)] uppercase tracking-widest">
+                                <Clock className="w-3.5 h-3.5" />
+                                {item.preparationTime} mins
                               </div>
-                              {cart.find(c => c.id === item.id) ? (
-                                <div className="flex items-center gap-3 bg-[var(--brand-gl3)] border border-[rgba(255,87,34,.2)] rounded-full px-2 py-1">
-                                  <button onClick={() => removeFromCart(item.id)} className="w-7 h-7 rounded-full bg-[var(--s2)] flex items-center justify-center text-[var(--brand)] hover:bg-[var(--brand)] hover:text-white transition-all">
-                                    <Minus className="w-3 h-3" />
-                                  </button>
-                                  <span className="fm text-xs font-bold w-4 text-center text-[var(--tx)]">{cart.find(c => c.id === item.id)?.qty}</span>
-                                  <button onClick={() => addToCart(item)} className="w-7 h-7 rounded-full bg-[var(--s2)] flex items-center justify-center text-[var(--brand)] hover:bg-[var(--brand)] hover:text-white transition-all">
-                                    <Plus className="w-3 h-3" />
-                                  </button>
-                                </div>
-                              ) : (
-                                <button 
-                                  onClick={() => addToCart(item)}
-                                  className="w-9 h-9 rounded-full bg-linear-to-br from-[var(--brand)] to-[var(--brand-lt)] text-white flex items-center justify-center shadow-lg shadow-[rgba(255,87,34,.3)] hover:scale-110 transition-all"
-                                >
-                                  <Plus className="w-5 h-5" />
-                                </button>
-                              )}
+                              <button 
+                                onClick={() => addToCart(item)}
+                                className="text-[10px] font-black uppercase tracking-widest text-[var(--brand)] hover:text-[var(--brand-lt)] transition-colors"
+                              >
+                                Add to Cart +
+                              </button>
                             </div>
                           </div>
                         </motion.div>
@@ -764,7 +770,7 @@ export default function App() {
               <div className="space-y-6">
                 <div className="flex justify-between items-center">
                   <div>
-                    <h2 className="fd text-2xl text-white">Your Wishlist</h2>
+                    <h2 className="fd text-2xl text-[var(--tx)]">Your Wishlist</h2>
                     <p className="text-xs text-[var(--tx3)]">Items you've saved for later</p>
                   </div>
                   <div className="text-[10px] font-bold text-[var(--tx4)] uppercase tracking-widest">
@@ -781,7 +787,7 @@ export default function App() {
                     <div className="w-24 h-24 bg-[var(--s2)] rounded-full flex items-center justify-center text-5xl mb-6 grayscale opacity-50">
                       ❤️
                     </div>
-                    <h3 className="fd text-xl text-white mb-2">Wishlist is empty</h3>
+                    <h3 className="fd text-xl text-[var(--tx)] mb-2">Wishlist is empty</h3>
                     <p className="text-xs text-[var(--tx3)] mb-8 max-w-[200px] mx-auto">
                       Save your favorite brews and snacks here to order them later.
                     </p>
@@ -851,7 +857,7 @@ export default function App() {
                     ].map(stat => (
                       <div key={stat.label} className="bg-[var(--s1)] border border-[var(--b1)] rounded-2xl p-5 relative overflow-hidden group">
                         <div className="text-2xl mb-2">{stat.icon}</div>
-                        <div className="fm text-2xl font-bold mb-1 text-white">{stat.val}</div>
+                        <div className="fm text-2xl font-bold mb-1 text-[var(--tx)]">{stat.val}</div>
                         <div className="text-[10px] text-[var(--tx3)] uppercase tracking-widest">{stat.label}</div>
                       </div>
                     ))}
@@ -888,7 +894,7 @@ export default function App() {
                           ❓
                         </div>
                       </div>
-                      <h3 className="fd text-2xl text-white mb-2">No orders found</h3>
+                      <h3 className="fd text-2xl text-[var(--tx)] mb-2">No orders found</h3>
                       <p className="text-sm text-[var(--tx3)] mb-8 max-w-xs mx-auto leading-relaxed">
                         Your order history is currently empty. Time to brew something new!
                       </p>
@@ -927,7 +933,7 @@ export default function App() {
                           <div className="text-[11px] text-[var(--tx3)]">{order.items}</div>
                         </div>
                         <div className="text-right">
-                          <div className="fm text-base font-bold text-white">₹{order.total.toFixed(2)}</div>
+                          <div className="fm text-base font-bold text-[var(--tx)]">₹{order.total.toFixed(2)}</div>
                           <div className="text-[10px] text-[var(--tx4)]">{order.date}</div>
                         </div>
                         <div className="absolute right-0 top-0 bottom-0 w-1 bg-[var(--brand)] opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -949,7 +955,7 @@ export default function App() {
                     <div className="absolute bottom-1 right-1 w-5 h-5 bg-green-500 border-4 border-[var(--s2)] rounded-full" />
                   </div>
                   <div className="flex-1 relative">
-                    <h2 className="fd text-3xl mb-1 text-white">{user.name}</h2>
+                    <h2 className="fd text-3xl mb-1 text-[var(--tx)]">{user.name}</h2>
                     <p className="fm text-sm text-[var(--tx3)] mb-4">{user.email}</p>
                     <div className="flex gap-6">
                       <div className="text-xs text-[var(--tx3)]">Dept: <span className="text-[var(--tx)] font-bold">{user.department}</span></div>
@@ -963,7 +969,7 @@ export default function App() {
                 </div>
 
                 <div className="grid grid-cols-2 gap-6">
-                  <div className="bg-[#0c0800] border border-[rgba(232,160,0,.18)] rounded-3xl p-6 relative overflow-hidden">
+                  <div className="bg-[var(--s1)] border border-[var(--b1)] rounded-3xl p-6 relative overflow-hidden">
                     <div className="absolute top-0 right-0 w-48 h-48 bg-[rgba(232,160,0,.06)] rounded-full blur-[50px] -translate-y-1/2 translate-x-1/2" />
                     <div className="text-[9px] text-[rgba(232,160,0,.5)] font-bold uppercase tracking-widest mb-2">Café Wallet</div>
                     <div className="fm text-4xl font-bold text-[var(--gold-lt)] mb-1">₹{walletBal.toFixed(2)}</div>
@@ -972,7 +978,7 @@ export default function App() {
                       <button onClick={() => setIsWalletOpen(true)} className="flex-1 bg-[rgba(232,160,0,.14)] border border-[rgba(232,160,0,.25)] text-[var(--gold-lt)] py-2.5 rounded-xl font-bold text-xs hover:bg-[rgba(232,160,0,.22)] transition-all">
                         + Recharge
                       </button>
-                      <button className="flex-1 bg-[var(--s2)] border border-[var(--b2)] text-[var(--tx3)] py-2.5 rounded-xl font-bold text-xs hover:text-white transition-all">
+                      <button className="flex-1 bg-[var(--s2)] border border-[var(--b2)] text-[var(--tx3)] py-2.5 rounded-xl font-bold text-xs hover:text-[var(--tx)] transition-all">
                         History
                       </button>
                     </div>
@@ -1022,7 +1028,7 @@ export default function App() {
                         </div>
                         {theme === 'light' && <div className="w-2 h-2 bg-[var(--brand)] rounded-full shadow-[0_0_8px_var(--brand)]" />}
                       </div>
-                      <div className={`text-sm font-bold ${theme === 'light' ? 'text-white' : 'text-[var(--tx3)]'}`}>Light Mode</div>
+                      <div className={`text-sm font-bold ${theme === 'light' ? 'text-[var(--tx)]' : 'text-[var(--tx3)]'}`}>Light Mode</div>
                       <div className="text-[10px] text-[var(--tx4)] uppercase tracking-widest font-bold mt-1">Clean & Bright</div>
                     </button>
 
@@ -1040,7 +1046,7 @@ export default function App() {
                         </div>
                         {theme === 'dark' && <div className="w-2 h-2 bg-[var(--brand)] rounded-full shadow-[0_0_8px_var(--brand)]" />}
                       </div>
-                      <div className={`text-sm font-bold ${theme === 'dark' ? 'text-white' : 'text-[var(--tx3)]'}`}>Dark Mode</div>
+                      <div className={`text-sm font-bold ${theme === 'dark' ? 'text-[var(--tx)]' : 'text-[var(--tx3)]'}`}>Dark Mode</div>
                       <div className="text-[10px] text-[var(--tx4)] uppercase tracking-widest font-bold mt-1">Deep & Focused</div>
                     </button>
                   </div>
@@ -1083,7 +1089,7 @@ export default function App() {
                           📧
                         </div>
                         <div>
-                          <div className="text-sm font-bold text-white">Email Summaries</div>
+                          <div className="text-sm font-bold text-[var(--tx)]">Email Summaries</div>
                           <div className="text-[10px] text-[var(--tx4)] uppercase tracking-widest font-bold">Weekly reports · Coming Soon</div>
                         </div>
                       </div>
@@ -1113,7 +1119,7 @@ export default function App() {
                         <div className="w-8 h-5 bg-blue-600 rounded flex items-center justify-center text-[8px] font-black text-white italic">VISA</div>
                         <div className="text-[10px] text-[var(--tx4)] font-bold uppercase tracking-widest">Primary Card</div>
                       </div>
-                      <div className="fm text-sm text-white mb-1">•••• •••• •••• 4242</div>
+                      <div className="fm text-sm text-[var(--tx)] mb-1">•••• •••• •••• 4242</div>
                       <div className="text-[9px] text-[var(--tx4)] uppercase">Expires 12/28</div>
                     </div>
 
@@ -1123,7 +1129,7 @@ export default function App() {
                           <Smartphone className="w-5 h-5" />
                         </div>
                         <div>
-                          <div className="text-sm font-bold text-white">sandeep@okaxis</div>
+                          <div className="text-sm font-bold text-[var(--tx)]">sandeep@okaxis</div>
                           <div className="text-[10px] text-[var(--tx4)] uppercase tracking-widest font-bold">Default UPI ID</div>
                         </div>
                       </div>
@@ -1146,7 +1152,7 @@ export default function App() {
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                   onClick={() => setIsCartOpen(false)}
-                  className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100]"
+                  className="fixed inset-0 bg-[var(--bg)]/60 backdrop-blur-sm z-[100]"
                 />
                 <motion.aside 
                   initial={{ x: '100%' }}
@@ -1157,7 +1163,7 @@ export default function App() {
                 >
                   <div className="p-5 border-b border-[var(--b1)] flex justify-between items-center bg-linear-to-b from-[rgba(255,87,34,.03)] to-transparent">
                     <div>
-                      <div className="fd text-lg text-white">Cart</div>
+                      <div className="fd text-lg text-[var(--tx)]">Cart</div>
                       <div className="text-[10px] text-[var(--tx3)] font-bold uppercase tracking-widest">
                         {cart.length} {cart.length === 1 ? 'item' : 'items'} selected
                       </div>
@@ -1202,7 +1208,7 @@ export default function App() {
                             className="absolute inset-0 bg-[var(--brand)] blur-3xl -z-10 rounded-full"
                           />
                         </div>
-                        <h3 className="fd text-xl text-white mb-2">Your cart is empty</h3>
+                        <h3 className="fd text-xl text-[var(--tx)] mb-2">Your cart is empty</h3>
                         <p className="text-xs text-[var(--tx3)] mb-8 leading-relaxed max-w-[200px]">
                           Looks like you haven't added anything to your brew list yet.
                         </p>
@@ -1218,14 +1224,14 @@ export default function App() {
                         <div key={item.id} className="flex items-center gap-3 py-3 border-b border-[var(--b1)] last:border-0">
                           <div className="text-2xl w-10 text-center">{item.emoji}</div>
                           <div className="flex-1 min-w-0">
-                            <div className="text-xs font-bold truncate text-white">{item.name}</div>
+                            <div className="text-xs font-bold truncate text-[var(--tx)]">{item.name}</div>
                             <div className="fm text-[10px] text-[var(--brand-xlt)]">₹{item.price} × {item.qty}</div>
                           </div>
                           <div className="flex items-center gap-2">
                             <button onClick={() => removeFromCart(item.id)} className="w-6 h-6 rounded-full border border-[var(--b1)] flex items-center justify-center text-[var(--tx4)] hover:border-[var(--brand)] hover:text-[var(--brand)]">
                               <Minus className="w-3 h-3" />
                             </button>
-                            <span className="fm text-xs font-bold w-4 text-center text-white">{item.qty}</span>
+                            <span className="fm text-xs font-bold w-4 text-center text-[var(--tx)]">{item.qty}</span>
                             <button onClick={() => addToCart(item)} className="w-6 h-6 rounded-full border border-[var(--b1)] flex items-center justify-center text-[var(--tx4)] hover:border-[var(--brand)] hover:text-[var(--brand)]">
                               <Plus className="w-3 h-3" />
                             </button>
@@ -1240,11 +1246,11 @@ export default function App() {
                       <div className="bg-[var(--s2)] border border-[var(--b1)] rounded-2xl p-4 space-y-2">
                         <div className="flex justify-between text-xs text-[var(--tx3)]">
                           <span>Subtotal</span>
-                          <span className="text-white">₹{cartTotal.toFixed(2)}</span>
+                          <span className="text-[var(--tx)]">₹{cartTotal.toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between text-xs text-[var(--tx3)]">
                           <span>GST (5%)</span>
-                          <span className="text-white">₹{gst.toFixed(2)}</span>
+                          <span className="text-[var(--tx)]">₹{gst.toFixed(2)}</span>
                         </div>
                         {isPromoApplied && (
                           <div className="flex justify-between text-xs text-green-400 font-bold">
@@ -1252,7 +1258,7 @@ export default function App() {
                             <span>-₹{discount.toFixed(2)}</span>
                           </div>
                         )}
-                        <div className="flex justify-between text-base font-bold pt-2 border-t border-[var(--b2)] text-white">
+                        <div className="flex justify-between text-base font-bold pt-2 border-t border-[var(--b2)] text-[var(--tx)]">
                           <span>Total</span>
                           <span className="fm text-[var(--brand-xlt)]">₹{grandTotal.toFixed(2)}</span>
                         </div>
@@ -1347,7 +1353,7 @@ export default function App() {
             >
               <div className="flex justify-between items-start mb-8">
                 <div>
-                  <h2 className="fd text-2xl text-white">Recharge Wallet</h2>
+                  <h2 className="fd text-2xl text-[var(--tx)]">Recharge Wallet</h2>
                   <p className="text-xs text-[var(--tx4)] font-bold uppercase tracking-widest mt-1">Instant · No transaction fee</p>
                 </div>
                 <button onClick={() => setIsWalletOpen(false)} className="p-2 hover:bg-[var(--s2)] rounded-xl transition-all text-[var(--tx4)]">
@@ -1366,7 +1372,7 @@ export default function App() {
                     }}
                     className="bg-[var(--s2)] border border-[var(--b1)] rounded-2xl p-4 hover:border-[var(--brand)] transition-all group"
                   >
-                    <div className="fm text-lg font-bold text-white group-hover:text-[var(--brand)]">₹{amt}</div>
+                    <div className="fm text-lg font-bold text-[var(--tx)] group-hover:text-[var(--brand)]">₹{amt}</div>
                     {amt >= 1000 && <div className="text-[8px] text-green-400 font-bold uppercase mt-1">+ Bonus</div>}
                   </button>
                 ))}
@@ -1405,7 +1411,7 @@ export default function App() {
               <div className="p-6 border-b border-[var(--b1)] flex justify-between items-center bg-linear-to-br from-[var(--s2)] to-[var(--s1)]">
                 <div>
                   <div className="text-[10px] text-[var(--tx4)] font-bold uppercase tracking-widest mb-1">Order Details</div>
-                  <h2 className="fm text-xl text-white">{selectedOrder.id}</h2>
+                  <h2 className="fm text-xl text-[var(--tx)]">{selectedOrder.id}</h2>
                 </div>
                 <button onClick={() => setSelectedOrder(null)} className="p-2 hover:bg-[var(--s3)] rounded-xl transition-all text-[var(--tx4)]">
                   <X className="w-5 h-5" />
@@ -1460,18 +1466,18 @@ export default function App() {
                       <div key={idx} className="flex items-center gap-3">
                         <div className="text-xl">{item.emoji}</div>
                         <div className="flex-1">
-                          <div className="text-xs font-bold text-white">{item.name}</div>
+                          <div className="text-xs font-bold text-[var(--tx)]">{item.name}</div>
                           <div className="text-[10px] text-[var(--tx4)]">₹{item.price} per unit</div>
                         </div>
                         <div className="text-right">
-                          <div className="text-xs font-bold text-white">x{item.qty}</div>
+                          <div className="text-xs font-bold text-[var(--tx)]">x{item.qty}</div>
                           <div className="fm text-xs text-[var(--brand-xlt)]">₹{(item.price * item.qty).toFixed(2)}</div>
                         </div>
                       </div>
                     ))}
                   </div>
                   <div className="p-4 bg-[var(--s3)] border-t border-[var(--b1)] flex justify-between items-center">
-                    <span className="text-xs font-bold text-white">Total Amount</span>
+                    <span className="text-xs font-bold text-[var(--tx)]">Total Amount</span>
                     <span className="fm text-lg font-bold text-[var(--brand)]">₹{selectedOrder.total.toFixed(2)}</span>
                   </div>
                 </div>
@@ -1485,7 +1491,7 @@ export default function App() {
                       <X className="w-4 h-4" /> Cancel Order
                     </button>
                   ) : (
-                    <button className="flex-1 bg-[var(--s2)] border border-[var(--b1)] text-white py-3 rounded-xl text-xs font-bold hover:bg-[var(--s3)] transition-all flex items-center justify-center gap-2">
+                    <button className="flex-1 bg-[var(--s2)] border border-[var(--b1)] text-[var(--tx)] py-3 rounded-xl text-xs font-bold hover:bg-[var(--s3)] transition-all flex items-center justify-center gap-2">
                       <Bell className="w-4 h-4" /> Notify Me
                     </button>
                   )}
@@ -1513,9 +1519,9 @@ export default function App() {
               <div className="w-16 h-16 bg-red-500/10 border border-red-500/20 rounded-full flex items-center justify-center text-2xl mx-auto mb-6 text-red-500">
                 ⚠️
               </div>
-              <h2 className="fd text-xl mb-2 text-white">Cancel Order?</h2>
+              <h2 className="fd text-xl mb-2 text-[var(--tx)]">Cancel Order?</h2>
               <p className="text-xs text-[var(--tx3)] mb-8 leading-relaxed">
-                Are you sure you want to cancel order <span className="text-white font-bold">{selectedOrder.id}</span>? 
+                Are you sure you want to cancel order <span className="text-[var(--tx)] font-bold">{selectedOrder.id}</span>? 
                 The full amount of <span className="text-[var(--brand)] font-bold">₹{selectedOrder.total.toFixed(2)}</span> will be refunded to your wallet.
               </p>
               
@@ -1552,13 +1558,13 @@ export default function App() {
               <div className="w-20 h-20 bg-green-500/10 border border-green-500/20 rounded-full flex items-center justify-center text-4xl mx-auto mb-6 text-green-500">
                 ✓
               </div>
-              <h2 className="fd text-2xl mb-2 text-white">Order Placed!</h2>
+              <h2 className="fd text-2xl mb-2 text-[var(--tx)]">Order Placed!</h2>
               <p className="text-sm text-[var(--tx3)] mb-8">Your order has been sent to the kitchen. We'll notify you when it's ready.</p>
               
               <div className="bg-[var(--s2)] border border-[var(--b1)] rounded-2xl p-5 text-left space-y-3 mb-8">
                 <div className="flex justify-between text-xs">
                   <span className="text-[var(--tx4)]">Order ID</span>
-                  <span className="fm font-bold text-white">{orderSuccess.id}</span>
+                  <span className="fm font-bold text-[var(--tx)]">{orderSuccess.id}</span>
                 </div>
                 <div className="flex justify-between text-xs">
                   <span className="text-[var(--tx4)]">Amount Paid</span>
@@ -1602,7 +1608,7 @@ export default function App() {
                   </div>
                   <div>
                     <div className="text-[10px] text-[var(--tx4)] font-bold uppercase tracking-widest mb-0.5">Payment Gateway</div>
-                    <h2 className="fm text-lg text-white">UPI Secure Pay</h2>
+                    <h2 className="fm text-lg text-[var(--tx)]">UPI Secure Pay</h2>
                   </div>
                 </div>
                 <button onClick={() => setIsPaymentModalOpen(false)} className="p-2 hover:bg-[var(--s3)] rounded-xl transition-all text-[var(--tx4)]">
@@ -1613,7 +1619,7 @@ export default function App() {
               <div className="p-8 text-center">
                 <div className="mb-8">
                   <div className="text-[11px] text-[var(--tx4)] font-bold uppercase tracking-widest mb-2">Amount to Pay</div>
-                  <div className="fm text-4xl font-black text-white">₹{currentPaymentOrder.amount.toFixed(2)}</div>
+                  <div className="fm text-4xl font-black text-[var(--tx)]">₹{currentPaymentOrder.amount.toFixed(2)}</div>
                   <div className="text-[10px] text-[var(--tx3)] mt-2">Order ID: {currentPaymentOrder.id}</div>
                 </div>
 
@@ -1649,7 +1655,7 @@ export default function App() {
                 </button>
                 <button 
                   onClick={() => setIsPaymentModalOpen(false)}
-                  className="w-full mt-4 py-2 text-[10px] font-bold text-[var(--tx4)] hover:text-white transition-colors uppercase tracking-widest"
+                  className="w-full mt-4 py-2 text-[10px] font-bold text-[var(--tx4)] hover:text-[var(--tx)] transition-colors uppercase tracking-widest"
                 >
                   Cancel Transaction
                 </button>
